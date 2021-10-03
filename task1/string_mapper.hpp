@@ -2,22 +2,26 @@
 
 #include <optional>
 #include <string_view>
+#include <memory>
+#include <cassert>
 
 using namespace std::literals::string_view_literals;
 
 template<size_t max_length>
 class String {
 public:
-    constexpr String(const char* string, size_t length) : string_(string), length_(std::min(length, max_length)) {
+    constexpr String(const char* string, size_t length) : length_(std::min(length, max_length)) {
+        for (size_t i = 0; i < length; ++i) {
+            string_[i] = string[i];
+        }
     }
 
     constexpr operator std::string_view() const {
         return {string_, length_};
     }
 
-private:
-    const char* string_;
     std::size_t length_;
+    char string_[max_length];
 };
 
 constexpr String<256> operator ""_cstr(const char* literal, size_t length) {
@@ -33,34 +37,46 @@ template<class From, auto target>
 struct Mapping {
     using from = From;
 
-    constexpr auto get() {
+    static constexpr auto get() {
         return target;
     }
 };
 
-template<class M>
+template<class M, class Target>
 concept IsMapping = requires(M m) {
-    ([]<class From, auto target> (Mapping<From, target> m) {})(m);
+    ([]<class From, Target target> (Mapping<From, target> m) {})(m);
 };
 
-template<class M, class Base>
-concept IsMappingAndDerivedOf = IsMapping<M> && std::is_base_of<Base, typename M::from>::value;
+template<class M, class Base, class Target>
+concept IsMappingAndConvertibleTo = IsMapping<M, Target> && std::is_convertible<typename M::from, Base>::value;
 
-template<class Base, class Target, IsMappingAndDerivedOf<Base>... Mappings>
+namespace inner {
+
+    template<int I, class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
+    struct MapHelper {
+        static std::optional<Target> doMap(const Base &object) {
+            try {
+                dynamic_cast<const typename std::tuple_element_t<I, std::tuple<Mappings...>>::from &>(object);
+                return ((typename std::tuple_element_t<I, std::tuple<Mappings...>>) {}).get();
+            } catch (std::bad_cast &e) {
+                return MapHelper<I - 1, Base, Target, Mappings...>::doMap(object);
+            }
+        }
+    };
+
+    template<class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
+    struct MapHelper<-1, Base, Target, Mappings...> {
+        static std::optional<Target> doMap(const Base &object) {
+            return std::optional<Target>{};
+        }
+    };
+}
+
+template<class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
 struct ClassMapper {
+    template<int I>
+    using Helper = inner::MapHelper<I, Base, Target, Mappings...>;
     static std::optional<Target> map(const Base &object) {
+        return Helper<sizeof...(Mappings) - 1>::doMap(object);
     }
 };
-
-class Animal {
-public:
-    virtual ~Animal() = default;
-};
-
-class Cat : public Animal {};
-class Cow : public Animal {};
-class Dog : public Animal {};
-class StBernard : public Dog {};
-class Horse : public Animal {};
-class RaceHorse : public Horse {};
-
