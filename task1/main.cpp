@@ -18,7 +18,7 @@ int main() {
             Animal, String<256>,
             Mapping<Cat, "meow"_cstr>,
             Mapping<Dog, "woof"_cstr>,
-            Mapping<Cow, "mooo"_cstr>
+            Mapping<StBernard, "mooo"_cstr>
     >;
 
     std::shared_ptr<Animal> some_animal{new Dog()};

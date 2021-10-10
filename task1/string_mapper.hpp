@@ -52,20 +52,20 @@ concept IsMappingAndConvertibleTo = IsMapping<M, Target> && std::is_convertible<
 
 namespace inner {
 
-    template<int I, class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
+    template<size_t I, size_t N, class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
     struct MapHelper {
         static std::optional<Target> doMap(const Base &object) {
             try {
                 dynamic_cast<const typename std::tuple_element_t<I, std::tuple<Mappings...>>::from &>(object);
                 return ((typename std::tuple_element_t<I, std::tuple<Mappings...>>) {}).get();
             } catch (std::bad_cast &e) {
-                return MapHelper<I - 1, Base, Target, Mappings...>::doMap(object);
+                return MapHelper<I + 1, N, Base, Target, Mappings...>::doMap(object);
             }
         }
     };
 
-    template<class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
-    struct MapHelper<-1, Base, Target, Mappings...> {
+    template<size_t N, class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
+    struct MapHelper<N, N, Base, Target, Mappings...> {
         static std::optional<Target> doMap(const Base &object) {
             return std::optional<Target>{};
         }
@@ -75,8 +75,8 @@ namespace inner {
 template<class Base, class Target, IsMappingAndConvertibleTo<Base, Target>... Mappings>
 struct ClassMapper {
     template<int I>
-    using Helper = inner::MapHelper<I, Base, Target, Mappings...>;
+    using Helper = inner::MapHelper<I, sizeof...(Mappings), Base, Target, Mappings...>;
     static std::optional<Target> map(const Base &object) {
-        return Helper<sizeof...(Mappings) - 1>::doMap(object);
+        return Helper<0>::doMap(object);
     }
 };
