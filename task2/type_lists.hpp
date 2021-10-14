@@ -87,13 +87,28 @@ namespace TypeLists {
         struct Take<0, TL> : Nil {
         };
 
+        template<TypeList TL, size_t N>
+        struct IsLonger {
+            constexpr static bool Value = IsLonger<typename TL::Tail, N - 1>::Value;
+        };
+
+        template<Empty E, size_t N>
+        struct IsLonger<E, N> {
+            constexpr static bool Value = false;
+        };
+
+        template<TypeSequence TS>
+        struct IsLonger<TS, 0> {
+            constexpr static bool Value = true;
+        };
+
         template<size_t N, TypeList TL>
         struct Drop {
             using Head = typename Drop<N - 1, typename TL::Tail>::Head;
             using Tail = typename Drop<N - 1, typename TL::Tail>::Tail;
         };
 
-        template<size_t N, TypeList TL> requires (Length<TL> <= N)
+        template<size_t N, TypeList TL> requires (!IsLonger<TL, N>::Value)
         struct Drop<N, TL> : Nil {
         };
 
@@ -121,10 +136,7 @@ namespace TypeLists {
 
         template<template<typename> typename F, Empty T>
         struct Map<F, T> : Nil {
-//            using Head = F<Nil>;
-//            using Tail = Nil;
         };
-
 
         template<template<typename> typename P, TypeList TL>
         struct Any {
@@ -134,6 +146,11 @@ namespace TypeLists {
         template<template<typename> typename P, Empty T>
         struct Any<P, T> {
             static constexpr bool Value = false;
+        };
+
+        template<template<typename> typename P, TypeSequence TS> requires (P<typename TS::Head>::Value)
+        struct Any<P, TS> {
+            static constexpr bool Value = true;
         };
 
         template<template<typename> typename P, TypeList TL>
@@ -234,6 +251,8 @@ namespace TypeLists {
 
         template<Empty E>
         struct Inits<E> {
+            using Head = Nil;
+            using Tail = Nil;
         };
 
         template<template<typename, typename> typename OP, TypeList TL, typename Prev>
@@ -264,16 +283,34 @@ namespace TypeLists {
             using Value = T;
         };
 
-        template<TypeList... TLs>
-        struct Zip : Nil {
+        template<typename... TLs>
+        struct Zip {
+        };
+
+        template<TypeSequence... TLs>
+        struct Zip<TLs...> {
             using Head = TypeTuples::TTuple<typename TLs::Head...>;
             using Tail = Zip<typename TLs::Tail...>;
         };
 
-        template<TypeList... TLs>
+        template<TypeList... TLs> requires (Empty<TLs> || ...)
         struct Zip<TLs...> : Nil {
         };
 
+        template<template<typename, typename> typename EQ, TypeList TL, typename T>
+        struct GroupByHelper {
+            using Value = Cons<typename TL::Head, typename GroupByHelper<EQ, typename TL::Tail, T>::Value>;
+        };
+
+        template<template<typename, typename> typename EQ, TypeList TL, typename T> requires (!EQ<typename TL::Head, T>::Value)
+        struct GroupByHelper<EQ, TL, T> {
+            using Value = Nil;
+        };
+
+        template<template<typename, typename> typename EQ, Empty E, typename T>
+        struct GroupByHelper<EQ, E, T> : Nil {
+            using Value = Nil;
+        };
     }
 
     template<TypeTuples::TypeTuple TT>
@@ -349,6 +386,19 @@ namespace TypeLists {
     struct Zip2<E, TL> : Nil {
 
     };
+
+    template<TypeList... TLs>
+    using Zip = Impl::Zip<TLs...>;
+
+    template<template<typename, typename> typename EQ, TypeList TL>
+    struct GroupBy {
+        using Head = typename Impl::GroupByHelper<EQ, TL, typename TL::Head>::Value;
+        using Tail = GroupBy<EQ, Drop<Impl::Length<Head>, TL>>;
+    };
+
+    template<template<typename, typename> typename EQ, Empty E>
+    struct GroupBy<EQ, E> : Nil {};
+
 }
 
 
@@ -387,12 +437,58 @@ namespace TypeTuples {
         using TypeList = TypeLists::Nil;
     };
 
-//    template<class... Ts>
-//    struct TTuple<std::tuple<Ts...>> {
-//        using Tuple = TypeTuples::TTuple<Ts...>;
-////        using TypeList = TypeLists::FromTuple<Tuple>;
-//    };
-
 }
 
-//static_assert(std::same_as<>);
+template<auto V>
+struct ValueTag {
+    static constexpr auto Value = V;
+};
+
+template<typename T>
+concept ValueTagType = requires {
+    T::Value;
+};
+
+template<typename L, typename R>
+concept SummableWith = ValueTagType<L> && ValueTagType<R> && requires {L::Value + R::Value;};
+
+template<class T, T... ts>
+using VTuple = TypeTuples::TTuple<ValueTag<ts>...>;
+
+template<int N>
+struct Ray {
+    using Head = ValueTag<N>;
+    using Tail = Ray<N + 1>;
+};
+
+using Nats = Ray<0>;
+
+template<ValueTagType First, ValueTagType Second> requires SummableWith<First, Second>
+struct FibHelper {
+    using Head = First;
+    using Tail = FibHelper<Second, ValueTag<First::Value + Second::Value>>;
+};
+
+using Fib = FibHelper<ValueTag<0>, ValueTag<1>>;
+
+template<ValueTagType N, size_t Counter> requires SummableWith<N, ValueTag<1>>
+struct IsNotPrime {
+    static constexpr bool Value = N::Value % Counter == 0 || IsNotPrime<N, Counter + 1>::Value;
+};
+
+template<typename N, size_t Counter> requires (SummableWith<N, ValueTag<1>> && N::Value > 1 && Counter * Counter > N::Value)
+struct IsNotPrime<N, Counter> {
+    static constexpr bool Value = false;
+};
+
+template<typename N, size_t Counter> requires (SummableWith<N, ValueTag<1>> && (N::Value == 1 || N::Value == 0))
+struct IsNotPrime<N, Counter> {
+    static constexpr bool Value = true;
+};
+
+template<ValueTagType T> requires (requires {T::Value % 42;}) // Проверка возможности взятия по модулю
+struct IsPrime {
+    static constexpr bool Value = !IsNotPrime<T, 2>::Value;
+};
+
+using Primes = TypeLists::Filter<IsPrime, Nats>;
