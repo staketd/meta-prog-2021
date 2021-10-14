@@ -186,4 +186,27 @@ int main() {
                             >
                             , char
                     >);
+
+    using TypeLists::Zip2;
+    static_assert(
+            std::same_as
+                    < ToTuple<Take<10, Zip2<Repeat<int>, Repeat<float>>>>
+                            , ToTuple<Take<10, Repeat<TTuple<int, float>>>>
+                    >);
+
+    static_assert(
+            std::same_as
+                    < ToTuple<Take<10, Zip2<FromTuple<TTuple<bool, char, int>>, Repeat<float>>>>
+                            , TTuple
+                            < TTuple<bool, float>
+                                    , TTuple<char, float>
+                                    , TTuple<int, float>
+                            >
+                    >);
+
+    static_assert(
+            std::same_as
+                    < ToTuple<Take<10, Zip2<FromTuple<TTuple<bool, char, int>>, Nil>>>
+                            , TTuple<>
+                    >);
 }
