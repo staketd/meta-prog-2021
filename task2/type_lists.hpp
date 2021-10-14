@@ -60,6 +60,12 @@ namespace TypeLists {
             using Tuple = typename std::tuple<>;
         };
 
+        template<TypeList TL>
+        constexpr size_t Length = 1 + Length<typename TL::Tail>;
+
+        template<>
+        constexpr size_t Length<Nil> = 0;
+
 
         template<size_t N, TypeList TL>
         struct Take {
@@ -67,10 +73,8 @@ namespace TypeLists {
             using Tail = Take<N - 1, typename TL::Tail>;
         };
 
-        template<size_t N, TypeList TL> requires (N > 1) && std::same_as<typename TL::Tail, Nil>
-        struct Take<N, TL> {
-            using Head = typename TL::Head;
-            using Tail = Nil;
+        template<size_t N, Empty E> requires (N > 1)
+        struct Take<N, E> : Nil {
         };
 
         template<TypeList TL>
@@ -82,12 +86,6 @@ namespace TypeLists {
         template<TypeList TL>
         struct Take<0, TL> : Nil {
         };
-
-        template<TypeList TL>
-        constexpr size_t Length = 1 + Length<typename TL::Tail>;
-
-        template<>
-        constexpr size_t Length<Nil> = 0;
 
         template<size_t N, TypeList TL>
         struct Drop {
@@ -266,6 +264,16 @@ namespace TypeLists {
             using Value = T;
         };
 
+        template<TypeList... TLs>
+        struct Zip : Nil {
+            using Head = TypeTuples::TTuple<typename TLs::Head...>;
+            using Tail = Zip<typename TLs::Tail...>;
+        };
+
+        template<TypeList... TLs>
+        struct Zip<TLs...> : Nil {
+        };
+
     }
 
     template<TypeTuples::TypeTuple TT>
@@ -325,6 +333,22 @@ namespace TypeLists {
 
     template<template<typename, typename> typename OP, typename T, TypeList TL>
     using Foldl = typename Impl::Foldl<OP, T, TL>::Value;
+
+    template<TypeList L, TypeList R>
+    struct Zip2 {
+        using Head = TypeTuples::TTuple<typename L::Head, typename R::Head>;
+        using Tail = Zip2<typename L::Tail, typename R::Tail>;
+    };
+
+    template<TypeList TL, Empty E>
+    struct Zip2<TL, E> : Nil {
+
+    };
+
+    template<TypeList TL, Empty E>
+    struct Zip2<E, TL> : Nil {
+
+    };
 }
 
 
