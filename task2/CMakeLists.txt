@@ -3,6 +3,4 @@ project(task2)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_compile_options(-ftemplate-backtrace-limit=0)
-
 add_executable(task2 main.cpp type_lists.hpp)
