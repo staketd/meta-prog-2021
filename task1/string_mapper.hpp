@@ -10,7 +10,7 @@ using namespace std::literals::string_view_literals;
 template<size_t max_length>
 class String {
 public:
-    constexpr String(const char *string, size_t length) : length_(std::min(length, max_length)) {
+    constexpr String(const char* string, size_t length) : length_(std::min(length, max_length)) {
         for (size_t i = 0; i < length; ++i) {
             string_[i] = string[i];
         }
@@ -24,7 +24,7 @@ public:
     char string_[max_length];
 };
 
-constexpr String<256> operator ""_cstr(const char *literal, size_t length) {
+constexpr String<256> operator ""_cstr(const char* literal, size_t length) {
     return {literal, length};
 }
 
@@ -53,7 +53,7 @@ namespace inner {
     template<class Base, class Target, IsMappingAndDerivedFrom<Base, Target>... Mappings>
     struct MapHelper {
         static std::optional<Target> doMap(const Base &object) {
-            return std::optional<Target> {};
+            return std::optional<Target>{};
         }
     };
 
@@ -64,7 +64,7 @@ namespace inner {
             if (sizeof...(Mappings) == 0) {
                 return std::optional<Target>{};
             }
-            auto *cast = dynamic_cast<const typename HeadMapping::from *>(&object);
+            auto* cast = dynamic_cast<const typename HeadMapping::from*>(&object);
             if (cast != nullptr) {
                 return HeadMapping::MappingValue;
             } else {
