@@ -45,28 +45,25 @@ concept IsMapping = requires(M m) {
 };
 
 template<class M, class Base, class Target>
-concept IsMappingAndDerivedFrom = IsMapping<M, Target> && std::derived_from<typename M::from, Base>
-                                  && std::is_convertible_v<decltype(M::MappingValue), Target>;
+concept IsMappingAndDerivedFrom = IsMapping<M, Target> && std::derived_from<typename M::from, Base>;
 
 namespace inner {
 
-    template<class Base, class Target, IsMappingAndDerivedFrom<Base, Target>... Mappings>
+    template<class Base, class Target, typename ... Mappings>
     struct MapHelper {
         static std::optional<Target> doMap(const Base &object) {
             return std::optional<Target>{};
         }
     };
 
-    template<class Base, class Target, IsMappingAndDerivedFrom<Base, Target> HeadMapping,
-            IsMappingAndDerivedFrom<Base, Target>... Mappings>
+    template<class Base, class Target, typename HeadMapping, typename ... Mappings>
     struct MapHelper<Base, Target, HeadMapping, Mappings...> {
         static std::optional<Target> doMap(const Base &object) {
-            if (sizeof...(Mappings) == 0) {
-                return std::optional<Target>{};
-            }
             auto* cast = dynamic_cast<const typename HeadMapping::from*>(&object);
             if (cast != nullptr) {
                 return HeadMapping::MappingValue;
+            } else if (sizeof...(Mappings) == 0) {
+                return std::optional<Target>{};
             } else {
                 return MapHelper<Base, Target, Mappings...>::doMap(object);
             }
